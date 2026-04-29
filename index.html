@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Zoom Imagen</title>
+
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        .z-container {
+            max-width: 500px;
+            width: 100%;
+            margin: 0 auto;
+            font-family: sans-serif;
+        }
+
+        .z-stage {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            overflow: hidden;
+            background: #000;
+            cursor: grab;
+        }
+
+        .z-stage:active {
+            cursor: grabbing;
+        }
+
+        .z-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: top left;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .z-controls {
+            margin-top: 12px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .z-slider {
+            width: 70%;
+            max-width: 320px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="z-container">
+
+        <div class="z-stage" id="zStage">
+            <img src="La_scapigliata.jpg" id="zImage" class="z-image" alt="Imagen">
+        </div>
+
+        <div class="z-controls">
+            <input type="range" min="0" max="3" step="0.01" value="0" class="z-slider" id="zSlider">
+        </div>
+
+    </div>
+
+    <script>
+        (function () {
+
+            var stage = document.getElementById('zStage');
+            var img = document.getElementById('zImage');
+            var slider = document.getElementById('zSlider');
+
+            var maxZoom = 3; // 🔧 CONFIGURABLE
+            slider.max = maxZoom;
+
+            var baseScale = 1;
+            var zoom = 0;
+            var scale = 1;
+
+            var pos = { x: 0, y: 0 };
+            var start = { x: 0, y: 0 };
+            var dragging = false;
+
+            function computeBaseScale() {
+                var rect = stage.getBoundingClientRect();
+                baseScale = rect.width / img.naturalWidth;
+            }
+
+            function updateScale() {
+                scale = baseScale * (1 + zoom);
+            }
+
+            function centerImage() {
+                var rect = stage.getBoundingClientRect();
+                var w = img.naturalWidth * scale;
+                var h = img.naturalHeight * scale;
+
+                pos.x = (rect.width - w) / 2;
+                pos.y = (rect.height - h) / 2;
+            }
+
+            function clamp() {
+                var rect = stage.getBoundingClientRect();
+                var w = img.naturalWidth * scale;
+                var h = img.naturalHeight * scale;
+
+                var minX = Math.min(0, rect.width - w);
+                var minY = Math.min(0, rect.height - h);
+
+                pos.x = Math.max(minX, Math.min(0, pos.x));
+                pos.y = Math.max(minY, Math.min(0, pos.y));
+            }
+
+            function update() {
+                img.style.transform = "translate(" + pos.x + "px," + pos.y + "px) scale(" + scale + ")";
+            }
+
+            img.onload = function () {
+                computeBaseScale();
+                updateScale();
+                centerImage();
+                update();
+            };
+
+            slider.addEventListener('input', function () {
+                zoom = parseFloat(slider.value);
+                updateScale();
+                clamp();
+                update();
+            });
+
+            // 🖱️ ZOOM CON RUEDA (centrado en cursor)
+            stage.addEventListener('wheel', function (e) {
+                e.preventDefault();
+
+                var rect = stage.getBoundingClientRect();
+
+                var mouseX = e.clientX - rect.left;
+                var mouseY = e.clientY - rect.top;
+
+                var prevScale = scale;
+
+                // Sensibilidad del zoom
+                var delta = -e.deltaY * 0.001;
+                zoom += delta;
+
+                zoom = Math.max(0, Math.min(maxZoom, zoom));
+                slider.value = zoom;
+
+                updateScale();
+
+                var scaleRatio = scale / prevScale;
+
+                // Ajustar posición para mantener foco en cursor
+                pos.x = mouseX - (mouseX - pos.x) * scaleRatio;
+                pos.y = mouseY - (mouseY - pos.y) * scaleRatio;
+
+                clamp();
+                update();
+
+            }, { passive: false });
+
+            // Drag
+            stage.addEventListener('mousedown', function (e) {
+                dragging = true;
+                start.x = e.clientX - pos.x;
+                start.y = e.clientY - pos.y;
+            });
+
+            window.addEventListener('mousemove', function (e) {
+                if (!dragging) return;
+                pos.x = e.clientX - start.x;
+                pos.y = e.clientY - start.y;
+                clamp();
+                update();
+            });
+
+            window.addEventListener('mouseup', function () {
+                dragging = false;
+            });
+
+            // Touch
+            stage.addEventListener('touchstart', function (e) {
+                var t = e.touches[0];
+                dragging = true;
+                start.x = t.clientX - pos.x;
+                start.y = t.clientY - pos.y;
+            });
+
+            stage.addEventListener('touchmove', function (e) {
+                if (!dragging) return;
+                var t = e.touches[0];
+                pos.x = t.clientX - start.x;
+                pos.y = t.clientY - start.y;
+                clamp();
+                update();
+            });
+
+            stage.addEventListener('touchend', function () {
+                dragging = false;
+            });
+
+        })();
+    </script>
+
+</body>
+
+</html>
